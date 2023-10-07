@@ -1,0 +1,21 @@
+version: '3'
+services:
+  proxypilot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - OLLAMA_BASE
+    expose:
+      - 61107
+    restart: always
+
+  mitmproxy:
+    image: mitmproxy/mitmproxy
+    command: ['mitmdump', '-s', '/mnt/redirect.py']
+    environment:
+      - REDIRECT_HOST=proxypilot
+    volumes:
+      - ./redirect.py:/mnt/redirect.py
+    ports:
+      - 61107:8080
