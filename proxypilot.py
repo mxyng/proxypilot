@@ -65,12 +65,41 @@ class OllamaRunner(web.View):
     return s
 
 
+class OpenAIRunner(web.View):
+
+  base = os.getenv('OPENAI_BASE')
+
+  async def _generate(self):
+    if not self.base:
+      self.base = f'{self.request.headers["X-Forwarded-Proto"]}://{self.request.headers["X-Forwarded-Host"]}'
+
+    async with ClientSession(self.base, headers=self.request.headers) as s:
+      async with s.post(self.request.path_qs, json=await self.request.json()) as r:
+        async for line in r.content:
+          yield line
+
+  async def post(self):
+    s = web.StreamResponse(headers={'Content-Type': 'text/event-stream'})
+    await s.prepare(self.request)
+
+    async for line in self._generate():
+      await s.write(b'data: ')
+      await s.write(line)
+      await s.write(b'\n')
+
+    await s.write(b'[DONE]')
+    return s
+
+
 def main():
   parser = ArgumentParser()
   subparsers = parser.add_subparsers(required=True)
 
   ollama_parser = subparsers.add_parser('ollama')
   ollama_parser.set_defaults(runner=OllamaRunner)
+
+  openai_parser = subparsers.add_parser('openai')
+  openai_parser.set_defaults(runner=OpenAIRunner)
 
   args = parser.parse_args()
 
