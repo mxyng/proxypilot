@@ -14,12 +14,17 @@ logging.basicConfig(
 class OllamaRunner(web.View):
 
   base = os.getenv('OLLAMA_BASE', 'http://127.0.0.1:11434')
-  model = os.getenv('OLLAMA_MODEL', 'codellama:7b-code')
 
   async def _ollama_request(self):
     r = await self.request.json()
+
+    language = r.get('extra', {}).get('language')
+    model = {
+      'python': os.getenv('OLLAMA_PYTHON_MODEL', 'codellama:7b-python'),
+    }.get(language, os.getenv('OLLAMA_PYTHON_MODEL', 'codellama:7b-code'))
+
     return {
-      'model': self.model,
+      'model': model,
       'template': '{{ .Prompt }}',
       'prompt': f'<PRE> {r.get("prompt")} <SUF>{r.get("suffix")} <MID>',
       'options': {
@@ -36,6 +41,7 @@ class OllamaRunner(web.View):
           '/api/generate',
           json=await self._ollama_request(),
       ) as r:
+        r.raise_for_status()
         async for line in r.content:
           yield json.loads(line)
 
@@ -57,6 +63,9 @@ class OllamaRunner(web.View):
     await s.prepare(self.request)
 
     async for line in self._generate():
+      if error := line.get('error'):
+        raise Exception(error)
+
       await s.write(b'data: ')
       await s.write(self._openai_response(line))
       await s.write(b'\n')
