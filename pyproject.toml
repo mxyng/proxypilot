@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-aiohttp = "^3.8.6"
+aiohttp = "^3.9.0"
 
 [build-system]
 requires = ["poetry-core"]
